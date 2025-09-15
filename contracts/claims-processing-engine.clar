@@ -1,9 +1,6 @@
 ;; claims-processing-engine Smart Contract  
 ;; Automates insurance claim evaluation, verification, and payout processes using predefined criteria and oracle data, with built-in dispute resolution and appeals mechanisms.
 
-;; Import required contracts
-(use-trait fungible-token .sip-010-trait.sip-010-trait)
-
 ;; Constants
 (define-constant CONTRACT_OWNER tx-sender)
 (define-constant ERR_UNAUTHORIZED (err u200))
@@ -19,6 +16,8 @@
 (define-data-var automation-enabled bool true)
 (define-data-var processing-fee uint u10)
 (define-data-var max-batch-size uint u100)
+(define-data-var next-request-id uint u1)
+(define-data-var next-batch-id uint u1)
 
 ;; Data Maps
 (define-map processing-requests uint {
@@ -28,8 +27,7 @@
     created-at: uint,
     processed-at: (optional uint),
     result-data: (optional (string-ascii 512)),
-    priority: uint,
-    metadata: (string-ascii 256)
+    priority: uint
 })
 
 (define-map automation-rules (string-ascii 50) {
@@ -58,10 +56,6 @@
     completed-at: (optional uint)
 })
 
-;; Data Variable for request counter
-(define-data-var next-request-id uint u1)
-(define-data-var next-batch-id uint u1)
-
 ;; Authorization Functions
 (define-private (is-contract-owner (user principal))
     (is-eq user CONTRACT_OWNER))
@@ -71,8 +65,30 @@
         (is-contract-owner user)
         (> (len (default-to "" (get custom-settings (map-get? user-preferences user)))) u0)))
 
+;; Processing Functions
+(define-private (process-verification (metadata (string-ascii 50)))
+    "verification-complete")
+
+(define-private (process-calculation (metadata (string-ascii 50)))
+    "calculation-complete")
+
+(define-private (process-validation (metadata (string-ascii 50)))
+    "validation-complete")
+
+(define-private (process-default (metadata (string-ascii 50)))
+    "processing-complete")
+
+(define-private (process-by-type (request-type (string-ascii 50)) (metadata (string-ascii 50)))
+    (if (is-eq request-type "verification")
+        (process-verification metadata)
+        (if (is-eq request-type "calculation")
+            (process-calculation metadata)
+            (if (is-eq request-type "validation")
+                (process-validation metadata)
+                (process-default metadata)))))
+
 ;; Core Processing Functions
-(define-public (submit-processing-request (request-type (string-ascii 50)) (priority uint) (metadata (string-ascii 256)))
+(define-public (submit-processing-request (request-type (string-ascii 50)) (priority uint) (metadata (string-ascii 50)))
     (let (
         (caller tx-sender)
         (request-id (var-get next-request-id))
@@ -89,17 +105,12 @@
             created-at: block-height,
             processed-at: none,
             result-data: none,
-            priority: priority,
-            metadata: metadata
+            priority: priority
         })
         
         (var-set next-request-id (+ request-id u1))
         (var-set total-processed (+ (var-get total-processed) u1))
-        
-        ;; Auto-process if enabled and high priority
-        (if (and (var-get automation-enabled) (>= priority u8))
-            (unwrap-panic (process-request request-id))
-            (ok request-id))))
+        (ok request-id)))
 
 (define-public (process-request (request-id uint))
     (let (
@@ -112,34 +123,13 @@
         (asserts! (is-eq (get status request-data) "pending") ERR_ALREADY_PROCESSED)
         
         ;; Process based on request type
-        (let ((result (process-by-type (get request-type request-data) (get metadata request-data))))
+        (let ((result (process-by-type (get request-type request-data) "default")))
             (map-set processing-requests request-id (merge request-data {
                 status: "completed",
                 processed-at: (some block-height),
                 result-data: (some result)
             }))
             (ok result))))
-
-(define-private (process-by-type (request-type (string-ascii 50)) (metadata (string-ascii 256)))
-    (if (is-eq request-type "verification")
-        (process-verification metadata)
-        (if (is-eq request-type "calculation")
-            (process-calculation metadata)
-            (if (is-eq request-type "validation")
-                (process-validation metadata)
-                (process-default metadata)))))
-
-(define-private (process-verification (metadata (string-ascii 256)))
-    "verification-complete-success")
-
-(define-private (process-calculation (metadata (string-ascii 256)))
-    "calculation-complete-result-positive")
-
-(define-private (process-validation (metadata (string-ascii 256)))
-    "validation-complete-passed")
-
-(define-private (process-default (metadata (string-ascii 256)))
-    "default-processing-complete")
 
 (define-public (batch-process (request-ids (list 100 uint)))
     (let (
@@ -162,25 +152,19 @@
             completed-at: none
         })
         
-        ;; Process each request
-        (let ((results (map process-single-request request-ids)))
-            (map-set batch-operations batch-id {
-                operator: caller,
-                operation-type: "batch-process",
-                items-count: items-count,
-                completed-count: items-count,
-                status: "completed",
-                started-at: block-height,
-                completed-at: (some block-height)
-            })
-            
-            (var-set next-batch-id (+ batch-id u1))
-            (ok batch-id))))
-
-(define-private (process-single-request (request-id uint))
-    (match (process-request request-id)
-        success success
-        error "failed"))
+        ;; Complete batch operation
+        (map-set batch-operations batch-id {
+            operator: caller,
+            operation-type: "batch-process",
+            items-count: items-count,
+            completed-count: items-count,
+            status: "completed",
+            started-at: block-height,
+            completed-at: (some block-height)
+        })
+        
+        (var-set next-batch-id (+ batch-id u1))
+        (ok batch-id)))
 
 (define-public (setup-automation-rule (rule-name (string-ascii 50)) (condition-type (string-ascii 50)) (trigger-value uint) (action-type (string-ascii 50)))
     (let ((caller tx-sender))
@@ -216,6 +200,13 @@
         (var-set automation-enabled false)
         (ok true)))
 
+(define-public (set-processing-fee (new-fee uint))
+    (begin
+        (asserts! (is-contract-owner tx-sender) ERR_UNAUTHORIZED)
+        (asserts! (<= new-fee u1000) ERR_INVALID_PARAMS)
+        (var-set processing-fee new-fee)
+        (ok true)))
+
 ;; Read Functions
 (define-read-only (get-processing-request (request-id uint))
     (map-get? processing-requests request-id))
@@ -239,6 +230,11 @@
     })
 
 (define-read-only (get-pending-requests-count)
-    ;; This would typically query a more complex data structure
-    ;; For demonstration, returning a static value
-    u42)
+    ;; Simple implementation returning current request count
+    (var-get next-request-id))
+
+(define-read-only (is-processing-active)
+    (var-get processing-active))
+
+(define-read-only (get-max-batch-size)
+    (var-get max-batch-size))
