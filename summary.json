@@ -1,20 +1,23 @@
 {
   "project_name": "decentralized-insurance-protocol",
-  "description": "A peer-to-peer insurance marketplace that eliminates traditional insurance intermediaries by enabling communities to pool funds and share risks directly. Policy holders contribute to shared insurance pools based on risk assessment algorithms, and claims are processed through transparent smart contracts with community governance. The platform covers various insurance types including health, property, crop, and travel insurance, with automated claim processing and dispute resolution mechanisms.", 
+  "description": "A peer-to-peer insurance marketplace that eliminates traditional insurance intermediaries by enabling communities to pool funds and share risks directly. Policy holders contribute to shared insurance pools based on risk assessment algorithms, and claims are processed through transparent smart contracts with community governance. The platform covers various insurance types including health, property, crop, and travel insurance, with automated claim processing and dispute resolution mechanisms.",
   "repository_url": "https://github.com/babacynthia20/decentralized-insurance-protocol",
-  "pull_request_url": "https://github.com/babacynthia20/decentralized-insurance-protocol/compare/main...feature/contracts",
+  "pull_request_url": "https://github.com/babacynthia20/decentralized-insurance-protocol/pull/1",
   "contracts": [
     {
       "name": "insurance-pool-manager",
       "description": "Manages community insurance pools, handles premium collections, risk assessment calculations, and maintains reserve funds with automated rebalancing based on claim patterns and pool performance."
     },
     {
-      "name": "claims-processing-engine", 
+      "name": "claims-processing-engine",
       "description": "Automates insurance claim evaluation, verification, and payout processes using predefined criteria and oracle data, with built-in dispute resolution and appeals mechanisms."
     }
   ],
   "github_user": "babacynthia20",
   "email": "babacynthia20@gmail.com",
-  "timestamp": "2025-09-15T00:21:32Z",
-  "session_id": "1757895148_20093"
+  "timestamp": "2025-09-15T00:39:02Z",
+  "session_id": "1757895148_20093",
+  "smart_contract_lines": 436,
+  "validation_status": "PASSED",
+  "automation_status": "COMPLETED"
 }
